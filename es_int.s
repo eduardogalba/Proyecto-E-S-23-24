@@ -33,9 +33,10 @@ IVR 	EQU 	$effc19	      * vector de interrupcion
 IMR_COPY		DS.B 1
 
 SR_COPY			DS.W 1	
-	
-*INCLUDE prueba_pag75.s
+
+* INCLUDE prueba_pag75.s	
 MAIN:	
+	
 **************************** INIT *********************************************************
 
 INIT: 		* 8b/caracter y RxRDY(solicitar INT cada vez que llegue un caracter)
@@ -157,9 +158,13 @@ F_SCAN:			MOVE.L D3,D0
 PRINT:			LINK A6,#-6
 			MOVE.L 8(A6),A0			* Buffer -> A0
 			MOVE.W 12(A6),D1		* Descriptor -> D1
+			MOVE.W 14(A6),D2 		* Tamanho -> D2
 			EOR.L D0,D0
 			EOR.L D3,D3		* Nº caracteres leidos
 
+		* Comprobacion del tamaño buffer
+			CMP.W #0,D2
+			BEQ F_PRINT
 		* Protocolo de entrada (Evalua el descriptor)
 			CMP.W #0,D1
 			BEQ PRINT_A
@@ -174,6 +179,8 @@ PRINT:			LINK A6,#-6
 PRINT_A: 		BCLR #0,D0
 			BSET #1,D0
 			MOVE.B (A0)+,D1
+			CMP.B #0,D1
+			BEQ F_PRINT
 		* Guardamos las variables locales
 			MOVE.L A0,-4(A6)
 			MOVE.W D3,-6(A6)
@@ -187,6 +194,16 @@ PRINT_A: 		BCLR #0,D0
 			MOVE.W 14(A6),D2		* Tamanho -> D2
 		* Incremento el nºcaracteres leidos
 			ADD.L #1,D3
+		* Habilitar interrupciones de transmision (Exclusion Mutua)
+		** Salvaguardo el registro de estado
+			MOVE.W SR,SR_COPY
+		** Enmascaro todas las interrupciones (DI)
+			MOVE.W #$2700,SR
+		** Entrada a Seccion Critica
+			BSET #0,IMR_COPY
+			MOVE.B IMR_COPY,IMR
+		*** Salida de Seccion Critica
+			MOVE.W SR_COPY,SR
 		* Comprobacion de si he copiado los tamanho bytes
 			CMP.L D2,D3
 			BNE PRINT_A
@@ -199,6 +216,8 @@ PRINT_A: 		BCLR #0,D0
 PRINT_B: 		BSET #0,D0
 			BSET #1,D0
 			MOVE.B (A0)+,D1
+			CMP.B #0,D1
+			BEQ F_PRINT
 		* Guardamos las variables locales
 			MOVE.L A0,-4(A6)
 			MOVE.W D3,-6(A6)
@@ -212,6 +231,16 @@ PRINT_B: 		BSET #0,D0
 			MOVE.W 14(A6),D2		* Tamanho -> D2
 		* Incremento el nºcaracteres leidos
 			ADD.L #1,D3
+		* Habilitar interrupciones de transmision (Exclusion Mutua)
+		** Salvaguardo el registro de estado
+			MOVE.W SR,SR_COPY
+		** Enmascaro todas las interrupciones (DI)
+			MOVE.W #$2700,SR
+		** Entrada a Seccion Critica
+			BSET #4,IMR_COPY
+			MOVE.B IMR_COPY,IMR
+		*** Salida de Seccion Critica
+			MOVE.W SR_COPY,SR
 		* Comprobacion de si he copiado los tamanho bytes
 			CMP.L D2,D3
 			BNE PRINT_B
@@ -226,34 +255,9 @@ PRINT_ERR: 		MOVE.L #$FFFFFFFF,D0
 			RTS
 	
 		* Salida correcta
-	
 F_PRINT:		MOVE.L D3,D0
-		* Habilitar interrupciones de transmision (Exclusion Mutua)
-		** Salvaguardo el registro de estado
-			MOVE.W SR,SR_COPY
-		** Enmascaro todas las interrupciones (DI)
-			MOVE.W #$2700,SR
-		** Entrada a Seccion Critica
-			MOVE.W 12(A6),D1		* Descriptor -> D1
-		** Determinar linea para habilitar
-			CMP.W #0,D1
-			BNE HAB_B
-	
-HAB_A:			BSET #0,IMR_COPY
-			MOVE.B IMR_COPY,IMR
-		*** Salida de Seccion Critica
-			MOVE.W SR_COPY,SR
-		*** Deshacer el marco de pila
-			UNLK A6		
+			UNLK A6			* Deshacer el marco de pila
 			RTS
-	
-HAB_B:			BSET #4,IMR_COPY
-			MOVE.B IMR_COPY,IMR
-		*** Salida de Seccion Critica
-			MOVE.W SR_COPY,SR
-		*** Deshacer el marco de pila
-			UNLK A6		
-			RTS	
 		
 
 **************************** FIN PRINT *********************************************************
